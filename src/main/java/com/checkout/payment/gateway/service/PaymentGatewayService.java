@@ -2,9 +2,9 @@ package com.checkout.payment.gateway.service;
 
 import com.checkout.payment.gateway.bank.AcquiringBankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
-import com.checkout.payment.gateway.exception.EventProcessingException;
+import com.checkout.payment.gateway.exception.PaymentNotFoundException;
+import com.checkout.payment.gateway.model.PaymentResponse;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
-import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -25,12 +25,18 @@ public class PaymentGatewayService {
     this.acquiringBankClient = acquiringBankClient;
   }
 
-  public PostPaymentResponse getPaymentById(UUID id) {
-    LOG.debug("Requesting access to payment with ID {}", id);
-    return paymentsRepository.get(id).orElseThrow(() -> new EventProcessingException("Invalid ID"));
+  public PaymentResponse getPaymentById(UUID id) {
+    LOG.debug("Retrieving payment id={}", id);
+    return paymentsRepository
+        .get(id)
+        .orElseThrow(
+            () -> {
+              LOG.info("Payment not found id={}", id);
+              return new PaymentNotFoundException(id);
+            });
   }
 
-  public PostPaymentResponse processPayment(PostPaymentRequest paymentRequest) {
+  public PaymentResponse processPayment(PostPaymentRequest paymentRequest) {
     UUID paymentId = UUID.randomUUID();
     LOG.info("Processing payment id={}", paymentId);
 
@@ -38,8 +44,8 @@ public class PaymentGatewayService {
     PaymentStatus status = authorized ? PaymentStatus.AUTHORIZED : PaymentStatus.DECLINED;
     String lastFour =
         paymentRequest.getCardNumber().substring(paymentRequest.getCardNumber().length() - 4);
-    PostPaymentResponse payment =
-        new PostPaymentResponse(
+    PaymentResponse payment =
+        new PaymentResponse(
             paymentId,
             status,
             lastFour,

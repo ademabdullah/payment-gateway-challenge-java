@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.file.Paths;
 import java.time.YearMonth;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,31 +15,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.BindMode;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
-@Tag("localAcceptance")
-@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PaymentFlowLocalAcceptanceTest {
-
-  @Container
-  private static final GenericContainer<?> BANK_SIMULATOR =
-      new GenericContainer<>(DockerImageName.parse("bbyars/mountebank:2.8.1"))
-          .withExposedPorts(2525, 8080)
-          .withFileSystemBind(
-              Paths.get("imposters").toAbsolutePath().toString(), "/imposters", BindMode.READ_ONLY)
-          .withCommand("--configfile", "/imposters/bank_simulator.ejs", "--allowInjection");
-
-  @DynamicPropertySource
-  static void bankProperties(DynamicPropertyRegistry registry) {
-    registry.add("bank.base-url", () -> "http://localhost:" + BANK_SIMULATOR.getMappedPort(8080));
-  }
 
   @LocalServerPort private int port;
 
@@ -62,7 +38,7 @@ class PaymentFlowLocalAcceptanceTest {
 
     String id = createdBody.get("id").asText();
     ResponseEntity<String> retrieved =
-        restTemplate.getForEntity(url("/payment/" + id), String.class);
+        restTemplate.getForEntity(url("/payments/" + id), String.class);
     assertThat(retrieved.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(objectMapper.readTree(retrieved.getBody()).get("id").asText()).isEqualTo(id);
   }
@@ -90,8 +66,9 @@ class PaymentFlowLocalAcceptanceTest {
     ResponseEntity<String> response = postPayment("2222405343248877", 0);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
-        .isEqualTo("Rejected");
+    JsonNode body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("status").asText()).isEqualTo("Rejected");
+    assertThat(body.at("/errors/amount/0").asText()).isEqualTo("must be greater than zero");
   }
 
   private ResponseEntity<String> postPayment(String cardNumber, int amount) {
@@ -111,7 +88,7 @@ class PaymentFlowLocalAcceptanceTest {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     return restTemplate.postForEntity(
-        url("/payment"), new HttpEntity<>(request, headers), String.class);
+        url("/payments"), new HttpEntity<>(request, headers), String.class);
   }
 
   private String url(String path) {
