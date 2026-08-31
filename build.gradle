@@ -2,7 +2,6 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.1.5'
     id 'io.spring.dependency-management' version '1.0.15.RELEASE'
-    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'com.checkout'
@@ -18,7 +17,6 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -26,89 +24,4 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-}
-
-spotless {
-    java {
-        target 'src/**/*.java'
-        googleJavaFormat('1.17.0')
-        removeUnusedImports()
-        trimTrailingWhitespace()
-    }
-}
-
-sourceSets {
-    localAcceptanceTest {
-        java.srcDir 'src/localAcceptanceTest/java'
-        resources.srcDir 'src/localAcceptanceTest/resources'
-        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
-        runtimeClasspath += output + compileClasspath
-    }
-}
-
-configurations {
-    localAcceptanceTestImplementation.extendsFrom testImplementation
-    localAcceptanceTestRuntimeOnly.extendsFrom testRuntimeOnly
-}
-
-def localAcceptanceContainer = "payment-gateway-bank-lat-${System.currentTimeMillis()}"
-
-tasks.register('stopBankSimulator', Exec) {
-    group = 'verification'
-    description = 'Stops the Dockerized bank simulator.'
-    workingDir projectDir
-    commandLine 'docker', 'stop', localAcceptanceContainer
-    ignoreExitValue = true
-}
-
-tasks.register('localAcceptanceTest', Test) {
-    group = 'verification'
-    description = 'Runs HTTP acceptance tests against the Dockerized bank simulator.'
-    testClassesDirs = sourceSets.localAcceptanceTest.output.classesDirs
-    classpath = sourceSets.localAcceptanceTest.runtimeClasspath
-    useJUnitPlatform()
-    shouldRunAfter tasks.named('test')
-
-    doFirst {
-        exec {
-            workingDir projectDir
-            commandLine 'docker', 'run', '--detach', '--rm',
-                    '--name', localAcceptanceContainer,
-                    '--publish', '127.0.0.1::2525',
-                    '--publish', '127.0.0.1::8080',
-                    '--volume', "${projectDir}/imposters:/imposters",
-                    'bbyars/mountebank:2.8.1',
-                    '--configfile', '/imposters/bank_simulator.ejs',
-                    '--allowInjection'
-        }
-
-        def publishedPort = { String containerPort ->
-            def output = new ByteArrayOutputStream()
-            exec {
-                commandLine 'docker', 'port', localAcceptanceContainer, "${containerPort}/tcp"
-                standardOutput = output
-            }
-            return output.toString().trim().tokenize(':').last().toInteger()
-        }
-        def adminPort = publishedPort('2525')
-        def bankPort = publishedPort('8080')
-        systemProperty 'bank.base-url', "http://localhost:${bankPort}"
-
-        def deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30)
-        def ready = false
-        while (!ready && System.nanoTime() < deadline) {
-            try {
-                new URL("http://localhost:${adminPort}/imposters")
-                        .getText(connectTimeout: 500, readTimeout: 500)
-                ready = true
-            } catch (Exception ignored) {
-                Thread.sleep(250)
-            }
-        }
-        if (!ready) {
-            throw new GradleException('Bank simulator did not become ready within 30 seconds')
-        }
-    }
-
-    finalizedBy tasks.named('stopBankSimulator')
 }
