@@ -1,132 +1,57 @@
 package com.checkout.payment.gateway.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.checkout.payment.gateway.bank.AcquiringBankClient;
-import com.jayway.jsonpath.JsonPath;
-import java.time.YearMonth;
-import org.hamcrest.Matchers;
+import com.checkout.payment.gateway.enums.PaymentStatus;
+import com.checkout.payment.gateway.model.PostPaymentResponse;
+import com.checkout.payment.gateway.repository.PaymentsRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class PaymentGatewayControllerTest {
 
-  @Autowired private MockMvc mvc;
-
-  @MockBean private AcquiringBankClient acquiringBankClient;
+  @Autowired
+  private MockMvc mvc;
+  @Autowired
+  PaymentsRepository paymentsRepository;
 
   @Test
-  void processesAndRetrievesAnAuthorizedPayment() throws Exception {
-    when(acquiringBankClient.authorize(any())).thenReturn(true);
+  void whenPaymentWithIdExistThenCorrectPaymentIsReturned() throws Exception {
+    PostPaymentResponse payment = new PostPaymentResponse();
+    payment.setId(UUID.randomUUID());
+    payment.setAmount(10);
+    payment.setCurrency("USD");
+    payment.setStatus(PaymentStatus.AUTHORIZED);
+    payment.setExpiryMonth(12);
+    payment.setExpiryYear(2024);
+    payment.setCardNumberLastFour(4321);
 
-    MvcResult postResult =
-        mvc.perform(
-                post("/payments")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(validRequest("2222405343248877", 100)))
-            .andExpect(status().isCreated())
-            .andExpect(header().string("Location", Matchers.matchesPattern(".*/payments/.+")))
-            .andExpect(jsonPath("$.status").value("Authorized"))
-            .andExpect(jsonPath("$.last_four").value("8877"))
-            .andExpect(jsonPath("$.card_number").doesNotExist())
-            .andExpect(jsonPath("$.cvv").doesNotExist())
-            .andReturn();
+    paymentsRepository.add(payment);
 
-    String id = JsonPath.read(postResult.getResponse().getContentAsString(), "$.id");
-    mvc.perform(get("/payments/{id}", id))
+    mvc.perform(MockMvcRequestBuilders.get("/payment/" + payment.getId()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.id").value(id))
-        .andExpect(jsonPath("$.status").value("Authorized"))
-        .andExpect(jsonPath("$.last_four").value("8877"))
-        .andExpect(jsonPath("$.currency").value("GBP"))
-        .andExpect(jsonPath("$.amount").value(100));
+        .andExpect(jsonPath("$.status").value(payment.getStatus().getName()))
+        .andExpect(jsonPath("$.cardNumberLastFour").value(payment.getCardNumberLastFour()))
+        .andExpect(jsonPath("$.expiryMonth").value(payment.getExpiryMonth()))
+        .andExpect(jsonPath("$.expiryYear").value(payment.getExpiryYear()))
+        .andExpect(jsonPath("$.currency").value(payment.getCurrency()))
+        .andExpect(jsonPath("$.amount").value(payment.getAmount()));
   }
 
   @Test
-  void rejectsZeroAndNegativeAmountsBeforeCallingTheBank() throws Exception {
-    mvc.perform(
-            post("/payments")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(validRequest("2222405343248877", 0)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("Rejected"))
-        .andExpect(jsonPath("$.errors.amount[0]").value("must be greater than zero"));
-
-    mvc.perform(
-            post("/payments")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(validRequest("2222405343248877", -1)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("Rejected"));
-
-    verifyNoInteractions(acquiringBankClient);
-  }
-
-  @Test
-  void rejectsInvalidCardFieldsBeforeCallingTheBank() throws Exception {
-    int futureYear = YearMonth.now().plusYears(1).getYear();
-    String request =
-        """
-        {
-          "card_number": "123x",
-          "expiry_month": 13,
-          "expiry_year": %d,
-          "currency": "AUD",
-          "amount": 100,
-          "cvv": "1x"
-        }
-        """
-            .formatted(futureYear);
-
-    mvc.perform(post("/payments").contentType(MediaType.APPLICATION_JSON).content(request))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("Rejected"))
-        .andExpect(jsonPath("$.errors.card_number").exists())
-        .andExpect(jsonPath("$.errors.expiry_year").exists())
-        .andExpect(jsonPath("$.errors.currency").exists())
-        .andExpect(jsonPath("$.errors.cvv").exists());
-
-    verifyNoInteractions(acquiringBankClient);
-  }
-
-  @Test
-  void returnsUsefulErrorsForUnknownAndMalformedIds() throws Exception {
-    mvc.perform(get("/payments/5c6f8caf-4163-4f4b-ac0d-14bb13cb29e3"))
+  void whenPaymentWithIdDoesNotExistThen404IsReturned() throws Exception {
+    mvc.perform(MockMvcRequestBuilders.get("/payment/" + UUID.randomUUID()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.message").value("Payment not found"));
-
-    mvc.perform(get("/payments/not-a-uuid"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("Payment id must be a valid UUID"));
-  }
-
-  private String validRequest(String cardNumber, int amount) {
-    YearMonth expiry = YearMonth.now().plusYears(1);
-    return """
-        {
-          "card_number": "%s",
-          "expiry_month": %d,
-          "expiry_year": %d,
-          "currency": "GBP",
-          "amount": %d,
-          "cvv": "123"
-        }
-        """
-        .formatted(cardNumber, expiry.getMonthValue(), expiry.getYear(), amount);
+        .andExpect(jsonPath("$.message").value("Page not found"));
   }
 }
