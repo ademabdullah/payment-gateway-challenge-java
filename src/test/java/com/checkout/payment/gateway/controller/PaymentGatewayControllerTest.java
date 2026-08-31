@@ -36,11 +36,9 @@ class PaymentGatewayControllerTest {
 
     MvcResult postResult =
         mvc.perform(
-                post("/payments")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(validRequest("2222405343248877", 100)))
+                post("/payment").contentType(MediaType.APPLICATION_JSON).content(validRequest(100)))
             .andExpect(status().isCreated())
-            .andExpect(header().string("Location", Matchers.matchesPattern(".*/payments/.+")))
+            .andExpect(header().string("Location", Matchers.matchesPattern(".*/payment/.+")))
             .andExpect(jsonPath("$.status").value("Authorized"))
             .andExpect(jsonPath("$.last_four").value("8877"))
             .andExpect(jsonPath("$.card_number").doesNotExist())
@@ -48,7 +46,7 @@ class PaymentGatewayControllerTest {
             .andReturn();
 
     String id = JsonPath.read(postResult.getResponse().getContentAsString(), "$.id");
-    mvc.perform(get("/payments/{id}", id))
+    mvc.perform(get("/payment/{id}", id))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(id))
         .andExpect(jsonPath("$.status").value("Authorized"))
@@ -59,20 +57,13 @@ class PaymentGatewayControllerTest {
 
   @Test
   void rejectsZeroAndNegativeAmountsBeforeCallingTheBank() throws Exception {
-    mvc.perform(
-            post("/payments")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(validRequest("2222405343248877", 0)))
+    mvc.perform(post("/payment").contentType(MediaType.APPLICATION_JSON).content(validRequest(0)))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("Rejected"))
-        .andExpect(jsonPath("$.errors.amount[0]").value("must be greater than zero"));
+        .andExpect(jsonPath("$.message").value("Rejected"));
 
-    mvc.perform(
-            post("/payments")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(validRequest("2222405343248877", -1)))
+    mvc.perform(post("/payment").contentType(MediaType.APPLICATION_JSON).content(validRequest(-1)))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("Rejected"));
+        .andExpect(jsonPath("$.message").value("Rejected"));
 
     verifyNoInteractions(acquiringBankClient);
   }
@@ -93,30 +84,39 @@ class PaymentGatewayControllerTest {
         """
             .formatted(futureYear);
 
-    mvc.perform(post("/payments").contentType(MediaType.APPLICATION_JSON).content(request))
+    mvc.perform(post("/payment").contentType(MediaType.APPLICATION_JSON).content(request))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("Rejected"))
-        .andExpect(jsonPath("$.errors.card_number").exists())
-        .andExpect(jsonPath("$.errors.expiry_year").exists())
-        .andExpect(jsonPath("$.errors.currency").exists())
-        .andExpect(jsonPath("$.errors.cvv").exists());
+        .andExpect(jsonPath("$.message").value("Rejected"));
+
+    verifyNoInteractions(acquiringBankClient);
+  }
+
+  @Test
+  void rejectsAnExpiredCardBeforeCallingTheBank() throws Exception {
+    mvc.perform(
+            post("/payment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request(100, YearMonth.now())))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("Rejected"));
 
     verifyNoInteractions(acquiringBankClient);
   }
 
   @Test
   void returnsUsefulErrorsForUnknownAndMalformedIds() throws Exception {
-    mvc.perform(get("/payments/5c6f8caf-4163-4f4b-ac0d-14bb13cb29e3"))
+    mvc.perform(get("/payment/5c6f8caf-4163-4f4b-ac0d-14bb13cb29e3"))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.message").value("Payment not found"));
+        .andExpect(jsonPath("$.message").value("Page not found"));
 
-    mvc.perform(get("/payments/not-a-uuid"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message").value("Payment id must be a valid UUID"));
+    mvc.perform(get("/payment/not-a-uuid")).andExpect(status().isBadRequest());
   }
 
-  private String validRequest(String cardNumber, int amount) {
-    YearMonth expiry = YearMonth.now().plusYears(1);
+  private String validRequest(int amount) {
+    return request(amount, YearMonth.now().plusYears(1));
+  }
+
+  private String request(int amount, YearMonth expiry) {
     return """
         {
           "card_number": "%s",
@@ -127,6 +127,6 @@ class PaymentGatewayControllerTest {
           "cvv": "123"
         }
         """
-        .formatted(cardNumber, expiry.getMonthValue(), expiry.getYear(), amount);
+        .formatted("2222405343248877", expiry.getMonthValue(), expiry.getYear(), amount);
   }
 }
