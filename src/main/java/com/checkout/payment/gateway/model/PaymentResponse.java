@@ -4,7 +4,7 @@ import com.checkout.payment.gateway.enums.PaymentStatus;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
-public class PostPaymentResponse {
+public class PaymentResponse {
 
   private final UUID id;
   private final PaymentStatus status;
@@ -21,7 +21,7 @@ public class PostPaymentResponse {
   private final String currency;
   private final int amount;
 
-  public PostPaymentResponse(
+  public PaymentResponse(
       UUID id,
       PaymentStatus status,
       String lastFour,

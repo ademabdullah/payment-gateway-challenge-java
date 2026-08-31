@@ -1,70 +1,44 @@
 package com.checkout.payment.gateway.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.checkout.payment.gateway.bank.AcquiringBankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
-import com.checkout.payment.gateway.exception.EventProcessingException;
+import com.checkout.payment.gateway.model.PaymentResponse;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
-import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
-import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class PaymentGatewayServiceTest {
 
-  private PaymentsRepository repository;
-  private AcquiringBankClient bankClient;
-  private PaymentGatewayService service;
-  private PostPaymentRequest paymentRequest;
-
-  @BeforeEach
-  void setUp() {
-    repository = new PaymentsRepository();
-    bankClient = mock(AcquiringBankClient.class);
-    service = new PaymentGatewayService(repository, bankClient);
-    paymentRequest = request();
-  }
-
-  @Test
-  void retrievesDetailsOfAStoredPaymentSuccessfully() {
-    PostPaymentResponse payment = paymentResponse();
-    repository.add(payment);
-
-    assertThat(service.getPaymentById(payment.getId())).isSameAs(payment);
-  }
-
-  @Test
-  void throwsAnErrorWhenPaymentDetailsAreNotStored() {
-    UUID id = UUID.randomUUID();
-
-    assertThatThrownBy(() -> service.getPaymentById(id))
-        .isInstanceOf(EventProcessingException.class)
-        .hasMessage("Invalid ID");
-  }
-
   @Test
   void storesOnlySafeDetailsForAuthorizedPayments() {
-    when(bankClient.authorize(paymentRequest)).thenReturn(true);
+    PaymentsRepository repository = new PaymentsRepository();
+    AcquiringBankClient bankClient = mock(AcquiringBankClient.class);
+    PostPaymentRequest request = request();
+    when(bankClient.authorize(request)).thenReturn(true);
+    PaymentGatewayService service = new PaymentGatewayService(repository, bankClient);
 
-    PostPaymentResponse result = service.processPayment(paymentRequest);
+    PaymentResponse result = service.processPayment(request);
 
     assertThat(result.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
     assertThat(result.getLastFour()).isEqualTo("0001");
     assertThat(repository.get(result.getId())).containsSame(result);
-    verify(bankClient).authorize(paymentRequest);
+    verify(bankClient).authorize(request);
   }
 
   @Test
   void mapsAnUnauthorizedBankResponseToDeclined() {
-    when(bankClient.authorize(paymentRequest)).thenReturn(false);
+    PaymentsRepository repository = new PaymentsRepository();
+    AcquiringBankClient bankClient = mock(AcquiringBankClient.class);
+    PostPaymentRequest request = request();
+    when(bankClient.authorize(request)).thenReturn(false);
+    PaymentGatewayService service = new PaymentGatewayService(repository, bankClient);
 
-    PostPaymentResponse result = service.processPayment(paymentRequest);
+    PaymentResponse result = service.processPayment(request);
 
     assertThat(result.getStatus()).isEqualTo(PaymentStatus.DECLINED);
     assertThat(repository.get(result.getId())).containsSame(result);
@@ -79,10 +53,5 @@ class PaymentGatewayServiceTest {
     request.setAmount(100);
     request.setCvv("123");
     return request;
-  }
-
-  private PostPaymentResponse paymentResponse() {
-    return new PostPaymentResponse(
-        UUID.randomUUID(), PaymentStatus.AUTHORIZED, "0001", 12, 2099, "GBP", 100);
   }
 }

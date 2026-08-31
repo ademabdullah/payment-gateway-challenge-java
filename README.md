@@ -21,7 +21,7 @@ Swagger UI is available at <http://localhost:8090/swagger-ui/index.html>.
 
 ### Process a payment
 
-`POST /payment`
+`POST /payments`
 
 ```json
 {
@@ -49,12 +49,12 @@ representation:
 }
 ```
 
-Invalid requests return `400 Bad Request` with the message `Rejected`. They are not sent to the
-bank or stored.
+Invalid requests return `400 Bad Request` with status `Rejected` and field-level errors. They are
+not sent to the bank or stored.
 
 ### Retrieve a payment
 
-`GET /payment/{id}` returns the stored safe representation, or `404 Not Found` when the payment
+`GET /payments/{id}` returns the stored safe representation, or `404 Not Found` when the payment
 does not exist.
 
 ## Validation and assumptions
@@ -101,9 +101,9 @@ Run the end-to-end HTTP acceptance suite with:
 ./gradlew localAcceptanceTest
 ```
 
-The JUnit acceptance test uses Testcontainers to start Mountebank on dynamically allocated ports,
-runs the application on a random port, tests real HTTP calls through the gateway to the simulator,
-and shuts the container down.
+That task starts the configured Mountebank image with Docker on dynamically allocated localhost
+ports, waits for it to become ready, runs the application on a random port, tests real HTTP calls
+through the gateway to the simulator, and shuts the container down.
 
 ## Design considerations and limitations
 
