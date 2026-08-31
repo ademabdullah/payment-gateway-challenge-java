@@ -1,7 +1,7 @@
 package com.checkout.payment.gateway.controller;
 
-import com.checkout.payment.gateway.model.PaymentResponse;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
+import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.service.PaymentGatewayService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("/payment")
 public class PaymentGatewayController {
 
   private final PaymentGatewayService paymentGatewayService;
@@ -26,9 +26,9 @@ public class PaymentGatewayController {
   }
 
   @PostMapping
-  public ResponseEntity<PaymentResponse> processPayment(
+  public ResponseEntity<PostPaymentResponse> processPayment(
       @Valid @RequestBody PostPaymentRequest paymentRequest) {
-    PaymentResponse payment = paymentGatewayService.processPayment(paymentRequest);
+    PostPaymentResponse payment = paymentGatewayService.processPayment(paymentRequest);
     URI location =
         ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{id}")
@@ -38,7 +38,7 @@ public class PaymentGatewayController {
   }
 
   @GetMapping("/{id}")
-  public ResponseEntity<PaymentResponse> getPaymentById(@PathVariable UUID id) {
+  public ResponseEntity<PostPaymentResponse> getPostPaymentEventById(@PathVariable UUID id) {
     return ResponseEntity.ok(paymentGatewayService.getPaymentById(id));
   }
 }

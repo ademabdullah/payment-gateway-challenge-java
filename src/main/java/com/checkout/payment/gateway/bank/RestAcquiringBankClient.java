@@ -2,7 +2,6 @@ package com.checkout.payment.gateway.bank;
 
 import com.checkout.payment.gateway.exception.BankCommunicationException;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,16 +26,7 @@ public class RestAcquiringBankClient implements AcquiringBankClient {
 
   @Override
   public boolean authorize(PostPaymentRequest paymentRequest) {
-    BankPaymentRequest bankRequest =
-        new BankPaymentRequest(
-            paymentRequest.getCardNumber(),
-            String.format(
-                "%02d/%d", paymentRequest.getExpiryMonth(), paymentRequest.getExpiryYear()),
-            paymentRequest.getCurrency(),
-            paymentRequest.getAmount(),
-            paymentRequest.getCvv());
-
-    long startedAt = System.nanoTime();
+    BankPaymentRequest bankRequest = toBankRequest(paymentRequest);
     try {
       ResponseEntity<BankPaymentResponse> response =
           restTemplate.postForEntity(paymentsUrl, bankRequest, BankPaymentResponse.class);
@@ -45,27 +35,23 @@ public class RestAcquiringBankClient implements AcquiringBankClient {
         throw new BankCommunicationException("Acquiring bank returned an invalid response");
       }
 
-      LOG.info(
-          "Acquiring bank call completed status={} authorized={} duration_ms={}",
-          response.getStatusCode().value(),
-          responseBody.getAuthorized(),
-          elapsedMilliseconds(startedAt));
+      LOG.info("Acquiring bank call completed authorized={}", responseBody.getAuthorized());
       return responseBody.getAuthorized();
     } catch (BankCommunicationException exception) {
-      LOG.warn(
-          "Acquiring bank call returned an invalid response duration_ms={}",
-          elapsedMilliseconds(startedAt));
+      LOG.warn("Acquiring bank returned an invalid response");
       throw exception;
     } catch (RestClientException exception) {
-      LOG.warn(
-          "Acquiring bank call failed type={} duration_ms={}",
-          exception.getClass().getSimpleName(),
-          elapsedMilliseconds(startedAt));
+      LOG.warn("Acquiring bank call failed type={}", exception.getClass().getSimpleName());
       throw new BankCommunicationException("Acquiring bank request failed", exception);
     }
   }
 
-  private long elapsedMilliseconds(long startedAt) {
-    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+  private BankPaymentRequest toBankRequest(PostPaymentRequest paymentRequest) {
+    return new BankPaymentRequest(
+        paymentRequest.getCardNumber(),
+        String.format("%02d/%d", paymentRequest.getExpiryMonth(), paymentRequest.getExpiryYear()),
+        paymentRequest.getCurrency(),
+        paymentRequest.getAmount(),
+        paymentRequest.getCvv());
   }
 }
