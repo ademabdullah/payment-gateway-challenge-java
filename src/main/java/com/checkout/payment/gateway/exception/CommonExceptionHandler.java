@@ -21,8 +21,9 @@ public class CommonExceptionHandler {
     return ResponseEntity.badRequest().body(new ErrorResponse("Rejected"));
   }
 
-  @ExceptionHandler(EventProcessingException.class)
-  public ResponseEntity<ErrorResponse> handlePaymentNotFound(EventProcessingException exception) {
+  @ExceptionHandler(PaymentNotFoundException.class)
+  public ResponseEntity<ErrorResponse> handlePaymentNotFound(PaymentNotFoundException exception) {
+    LOG.info("A payment for this paymentId could not be found");
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("Payment not found"));
   }
 

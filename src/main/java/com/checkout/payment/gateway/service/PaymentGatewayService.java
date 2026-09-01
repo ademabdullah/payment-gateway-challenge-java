@@ -2,7 +2,7 @@ package com.checkout.payment.gateway.service;
 
 import com.checkout.payment.gateway.bank.AcquiringBankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
-import com.checkout.payment.gateway.exception.EventProcessingException;
+import com.checkout.payment.gateway.exception.PaymentNotFoundException;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
@@ -26,13 +26,15 @@ public class PaymentGatewayService {
   }
 
   public PostPaymentResponse getPaymentById(UUID id) {
-    LOG.debug("Requesting access to payment with ID {}", id);
-    return paymentsRepository.get(id).orElseThrow(() -> new EventProcessingException("Invalid ID"));
+    LOG.info("Request made to access payment with ID {}", id);
+    return paymentsRepository
+        .get(id)
+        .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
   }
 
   public PostPaymentResponse processPayment(PostPaymentRequest paymentRequest) {
     UUID paymentId = UUID.randomUUID();
-    LOG.info("Processing payment id={}", paymentId);
+    LOG.info("Request made to process payment with ID {}", paymentId);
 
     boolean authorized = acquiringBankClient.authorize(paymentRequest);
     PaymentStatus status = authorized ? PaymentStatus.AUTHORIZED : PaymentStatus.DECLINED;

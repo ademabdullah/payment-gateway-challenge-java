@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.checkout.payment.gateway.bank.AcquiringBankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
-import com.checkout.payment.gateway.exception.EventProcessingException;
+import com.checkout.payment.gateway.exception.PaymentNotFoundException;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
@@ -44,8 +44,8 @@ class PaymentGatewayServiceTest {
     UUID id = UUID.randomUUID();
 
     assertThatThrownBy(() -> service.getPaymentById(id))
-        .isInstanceOf(EventProcessingException.class)
-        .hasMessage("Invalid ID");
+        .isInstanceOf(PaymentNotFoundException.class)
+        .hasMessage("Payment not found");
   }
 
   @Test
