@@ -82,7 +82,7 @@ class PaymentFlowLocalAcceptanceTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
     assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
-        .isEqualTo("Acquiring bank unavailable");
+        .isEqualTo("Bank is unavailable");
   }
 
   @Test

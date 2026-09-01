@@ -23,13 +23,13 @@ public class CommonExceptionHandler {
 
   @ExceptionHandler(EventProcessingException.class)
   public ResponseEntity<ErrorResponse> handlePaymentNotFound(EventProcessingException exception) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("Page not found"));
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("Payment not found"));
   }
 
   @ExceptionHandler(BankCommunicationException.class)
   public ResponseEntity<ErrorResponse> handleBankFailure(BankCommunicationException exception) {
-    LOG.warn("Payment could not be completed because the acquiring bank call failed");
+    LOG.warn("Payment could not be completed because the call to the bank has failed");
     return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-        .body(new ErrorResponse("Acquiring bank unavailable"));
+        .body(new ErrorResponse("Bank is unavailable"));
   }
 }

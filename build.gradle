@@ -38,16 +38,17 @@ spotless {
         googleJavaFormat('1.17.0')
         removeUnusedImports()
         trimTrailingWhitespace()
+        endWithNewline()
     }
 }
 
 tasks.register('localAcceptanceTest', Test) {
     group = 'verification'
-    description = 'Runs HTTP acceptance tests against the Dockerized bank simulator.'
+    description = 'Runs acceptance tests against the dockerized bank simulator.'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform {
         includeTags 'localAcceptance'
     }
-    shouldRunAfter tasks.named('test')
+    dependsOn tasks.named('test')
 }

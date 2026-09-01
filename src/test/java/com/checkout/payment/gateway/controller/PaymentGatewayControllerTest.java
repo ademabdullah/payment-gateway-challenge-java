@@ -107,7 +107,7 @@ class PaymentGatewayControllerTest {
   void returnsUsefulErrorsForUnknownAndMalformedIds() throws Exception {
     mvc.perform(get("/payment/5c6f8caf-4163-4f4b-ac0d-14bb13cb29e3"))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.message").value("Page not found"));
+        .andExpect(jsonPath("$.message").value("Payment not found"));
 
     mvc.perform(get("/payment/not-a-uuid")).andExpect(status().isBadRequest());
   }
