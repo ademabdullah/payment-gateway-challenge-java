@@ -7,6 +7,8 @@ import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ public class PaymentGatewayService {
 
   private final PaymentsRepository paymentsRepository;
   private final AcquiringBankClient acquiringBankClient;
+  private final ConcurrentMap<String, PostPaymentResponse> idempotentPaymentResponses =
+      new ConcurrentHashMap<>();
 
   public PaymentGatewayService(
       PaymentsRepository paymentsRepository, AcquiringBankClient acquiringBankClient) {
@@ -32,7 +36,17 @@ public class PaymentGatewayService {
         .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
   }
 
-  public PostPaymentResponse processPayment(PostPaymentRequest paymentRequest) {
+  public PostPaymentResponse processPayment(
+      PostPaymentRequest paymentRequest, String idempotencyKey) {
+    if (idempotencyKey == null || idempotencyKey.isBlank()) {
+      return processNewPayment(paymentRequest);
+    }
+
+    return idempotentPaymentResponses.computeIfAbsent(
+        idempotencyKey, ignoredIdempotencyKey -> processNewPayment(paymentRequest));
+  }
+
+  private PostPaymentResponse processNewPayment(PostPaymentRequest paymentRequest) {
     UUID paymentId = UUID.randomUUID();
     LOG.info("Request made to process payment with ID {}", paymentId);
 

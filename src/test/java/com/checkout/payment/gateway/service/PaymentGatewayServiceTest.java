@@ -3,11 +3,13 @@ package com.checkout.payment.gateway.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.checkout.payment.gateway.bank.AcquiringBankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
+import com.checkout.payment.gateway.exception.BankCommunicationException;
 import com.checkout.payment.gateway.exception.PaymentNotFoundException;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
@@ -52,7 +54,7 @@ class PaymentGatewayServiceTest {
   void storesOnlySafeDetailsForAuthorizedPayments() {
     when(bankClient.authorize(paymentRequest)).thenReturn(true);
 
-    PostPaymentResponse result = service.processPayment(paymentRequest);
+    PostPaymentResponse result = service.processPayment(paymentRequest, null);
 
     assertThat(result.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
     assertThat(result.getLastFour()).isEqualTo("0001");
@@ -64,10 +66,59 @@ class PaymentGatewayServiceTest {
   void mapsAnUnauthorizedBankResponseToDeclined() {
     when(bankClient.authorize(paymentRequest)).thenReturn(false);
 
-    PostPaymentResponse result = service.processPayment(paymentRequest);
+    PostPaymentResponse result = service.processPayment(paymentRequest, null);
 
     assertThat(result.getStatus()).isEqualTo(PaymentStatus.DECLINED);
     assertThat(repository.get(result.getId())).containsSame(result);
+  }
+
+  @Test
+  void treatsABlankIdempotencyKeyAsANormalPaymentRequest() {
+    when(bankClient.authorize(paymentRequest)).thenReturn(true);
+
+    service.processPayment(paymentRequest, " ");
+    service.processPayment(paymentRequest, " ");
+
+    verify(bankClient, times(2)).authorize(paymentRequest);
+  }
+
+  @Test
+  void returnsTheOriginalPaymentWhenAnIdempotencyKeyIsReused() {
+    when(bankClient.authorize(paymentRequest)).thenReturn(true);
+
+    PostPaymentResponse firstPayment = service.processPayment(paymentRequest, "payment-key");
+    PostPaymentResponse repeatedPayment = service.processPayment(paymentRequest, "payment-key");
+
+    assertThat(repeatedPayment).isSameAs(firstPayment);
+    verify(bankClient).authorize(paymentRequest);
+  }
+
+  @Test
+  void processesDifferentIdempotencyKeysAsDifferentPayments() {
+    when(bankClient.authorize(paymentRequest)).thenReturn(true);
+
+    PostPaymentResponse firstPayment = service.processPayment(paymentRequest, "first-payment-key");
+    PostPaymentResponse secondPayment =
+        service.processPayment(paymentRequest, "second-payment-key");
+
+    assertThat(secondPayment.getId()).isNotEqualTo(firstPayment.getId());
+    verify(bankClient, times(2)).authorize(paymentRequest);
+  }
+
+  @Test
+  void allowsAnIdempotencyKeyToBeRetriedAfterABankFailure() {
+    when(bankClient.authorize(paymentRequest))
+        .thenThrow(new BankCommunicationException("Bank is unavailable"))
+        .thenReturn(true);
+
+    assertThatThrownBy(() -> service.processPayment(paymentRequest, "retryable-payment-key"))
+        .isInstanceOf(BankCommunicationException.class);
+
+    PostPaymentResponse retriedPayment =
+        service.processPayment(paymentRequest, "retryable-payment-key");
+
+    assertThat(retriedPayment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
+    verify(bankClient, times(2)).authorize(paymentRequest);
   }
 
   private PostPaymentRequest request() {

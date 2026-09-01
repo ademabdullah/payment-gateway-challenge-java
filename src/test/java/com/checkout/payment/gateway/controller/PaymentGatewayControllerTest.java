@@ -1,6 +1,8 @@
 package com.checkout.payment.gateway.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.checkout.payment.gateway.bank.AcquiringBankClient;
 import com.jayway.jsonpath.JsonPath;
 import java.time.YearMonth;
-import org.hamcrest.Matchers;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -38,7 +40,7 @@ class PaymentGatewayControllerTest {
         mvc.perform(
                 post("/payment").contentType(MediaType.APPLICATION_JSON).content(validRequest(100)))
             .andExpect(status().isCreated())
-            .andExpect(header().string("Location", Matchers.matchesPattern(".*/payment/.+")))
+            .andExpect(header().doesNotExist("Location"))
             .andExpect(jsonPath("$.status").value("Authorized"))
             .andExpect(jsonPath("$.last_four").value("8877"))
             .andExpect(jsonPath("$.card_number").doesNotExist())
@@ -53,6 +55,35 @@ class PaymentGatewayControllerTest {
         .andExpect(jsonPath("$.last_four").value("8877"))
         .andExpect(jsonPath("$.currency").value("GBP"))
         .andExpect(jsonPath("$.amount").value(100));
+  }
+
+  @Test
+  void returnsTheOriginalPaymentForARepeatedIdempotencyKey() throws Exception {
+    when(acquiringBankClient.authorize(any())).thenReturn(true);
+    String idempotencyKey = UUID.randomUUID().toString();
+
+    MvcResult firstResult =
+        mvc.perform(
+                post("/payment")
+                    .header("Idempotency-Key", idempotencyKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(validRequest(100)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    MvcResult repeatedResult =
+        mvc.perform(
+                post("/payment")
+                    .header("Idempotency-Key", idempotencyKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(validRequest(100)))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+    String firstPaymentId = JsonPath.read(firstResult.getResponse().getContentAsString(), "$.id");
+    String repeatedPaymentId =
+        JsonPath.read(repeatedResult.getResponse().getContentAsString(), "$.id");
+    assertThat(repeatedPaymentId).isEqualTo(firstPaymentId);
+    verify(acquiringBankClient).authorize(any());
   }
 
   @Test

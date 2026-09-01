@@ -94,7 +94,23 @@ class PaymentFlowLocalAcceptanceTest {
         .isEqualTo("Rejected");
   }
 
+  @Test
+  void returnsTheOriginalPaymentForARepeatedIdempotencyKey() throws Exception {
+    String idempotencyKey = "acceptance-payment-key";
+
+    ResponseEntity<String> firstResponse = postPayment("2222405343248877", 100, idempotencyKey);
+    ResponseEntity<String> repeatedResponse = postPayment("2222405343248877", 100, idempotencyKey);
+
+    String firstPaymentId = objectMapper.readTree(firstResponse.getBody()).get("id").asText();
+    String repeatedPaymentId = objectMapper.readTree(repeatedResponse.getBody()).get("id").asText();
+    assertThat(repeatedPaymentId).isEqualTo(firstPaymentId);
+  }
+
   private ResponseEntity<String> postPayment(String cardNumber, int amount) {
+    return postPayment(cardNumber, amount, null);
+  }
+
+  private ResponseEntity<String> postPayment(String cardNumber, int amount, String idempotencyKey) {
     YearMonth expiry = YearMonth.now().plusYears(1);
     String request =
         """
@@ -110,6 +126,9 @@ class PaymentFlowLocalAcceptanceTest {
             .formatted(cardNumber, expiry.getMonthValue(), expiry.getYear(), amount);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
+    if (idempotencyKey != null) {
+      headers.set("Idempotency-Key", idempotencyKey);
+    }
     return restTemplate.postForEntity(
         url("/payment"), new HttpEntity<>(request, headers), String.class);
   }
