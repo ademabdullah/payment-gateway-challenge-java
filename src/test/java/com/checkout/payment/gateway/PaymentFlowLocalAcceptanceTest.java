@@ -86,7 +86,7 @@ class PaymentFlowLocalAcceptanceTest {
   }
 
   @Test
-  void rejectsInvalidAmountsBeforeCallingTheBank() throws Exception {
+  void rejectsInvalidPaymentAmountBeforeCallingTheBank() throws Exception {
     ResponseEntity<String> response = postPayment("2222405343248877", 0);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);

@@ -53,7 +53,7 @@ Invalid requests return `400 Bad Request` with the message `Rejected`. They are 
 bank or stored.
 
 ### Idempotency
-
+  
 The POST endpoint accepts an optional `Idempotency-Key` header:
 
 ```shell

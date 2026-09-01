@@ -35,13 +35,13 @@ public class RestAcquiringBankClient implements AcquiringBankClient {
         throw new BankCommunicationException("Acquiring bank returned an invalid response");
       }
 
-      LOG.info("Acquiring bank call completed authorized={}", responseBody.getAuthorized());
+      LOG.info("Acquiring bank call completed, authorized={}", responseBody.getAuthorized());
       return responseBody.getAuthorized();
     } catch (BankCommunicationException exception) {
       LOG.warn("Acquiring bank returned an invalid response");
       throw exception;
     } catch (RestClientException exception) {
-      LOG.warn("Acquiring bank call failed type={}", exception.getClass().getSimpleName());
+      LOG.warn("Call to acquiring bank failed");
       throw new BankCommunicationException("Acquiring bank request failed", exception);
     }
   }
