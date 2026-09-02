@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.checkout.payment.gateway.bank.AcquiringBankClient;
+import com.checkout.payment.gateway.bank.BankClient;
 import com.jayway.jsonpath.JsonPath;
 import java.time.YearMonth;
 import java.util.UUID;
@@ -30,11 +30,11 @@ class PaymentGatewayControllerTest {
 
   @Autowired private MockMvc mvc;
 
-  @MockBean private AcquiringBankClient acquiringBankClient;
+  @MockBean private BankClient bankClient;
 
   @Test
   void processesAndRetrievesAnAuthorizedPayment() throws Exception {
-    when(acquiringBankClient.authorize(any())).thenReturn(true);
+    when(bankClient.authorize(any())).thenReturn(true);
 
     MvcResult postResult =
         mvc.perform(
@@ -59,7 +59,7 @@ class PaymentGatewayControllerTest {
 
   @Test
   void returnsTheOriginalPaymentForARepeatedIdempotencyKey() throws Exception {
-    when(acquiringBankClient.authorize(any())).thenReturn(true);
+    when(bankClient.authorize(any())).thenReturn(true);
     String idempotencyKey = UUID.randomUUID().toString();
 
     MvcResult firstResult =
@@ -83,7 +83,7 @@ class PaymentGatewayControllerTest {
     String repeatedPaymentId =
         JsonPath.read(repeatedResult.getResponse().getContentAsString(), "$.id");
     assertThat(repeatedPaymentId).isEqualTo(firstPaymentId);
-    verify(acquiringBankClient).authorize(any());
+    verify(bankClient).authorize(any());
   }
 
   @Test
@@ -96,7 +96,7 @@ class PaymentGatewayControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("Rejected"));
 
-    verifyNoInteractions(acquiringBankClient);
+    verifyNoInteractions(bankClient);
   }
 
   @Test
@@ -119,7 +119,7 @@ class PaymentGatewayControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("Rejected"));
 
-    verifyNoInteractions(acquiringBankClient);
+    verifyNoInteractions(bankClient);
   }
 
   @Test
@@ -131,7 +131,7 @@ class PaymentGatewayControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("Rejected"));
 
-    verifyNoInteractions(acquiringBankClient);
+    verifyNoInteractions(bankClient);
   }
 
   @Test

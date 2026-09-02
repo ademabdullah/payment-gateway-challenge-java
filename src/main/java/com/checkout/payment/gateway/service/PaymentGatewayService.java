@@ -1,6 +1,6 @@
 package com.checkout.payment.gateway.service;
 
-import com.checkout.payment.gateway.bank.AcquiringBankClient;
+import com.checkout.payment.gateway.bank.BankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
 import com.checkout.payment.gateway.exception.PaymentNotFoundException;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
@@ -19,14 +19,13 @@ public class PaymentGatewayService {
   private static final Logger LOG = LoggerFactory.getLogger(PaymentGatewayService.class);
 
   private final PaymentsRepository paymentsRepository;
-  private final AcquiringBankClient acquiringBankClient;
+  private final BankClient bankClient;
   private final ConcurrentMap<String, PostPaymentResponse> idempotentPaymentResponses =
       new ConcurrentHashMap<>();
 
-  public PaymentGatewayService(
-      PaymentsRepository paymentsRepository, AcquiringBankClient acquiringBankClient) {
+  public PaymentGatewayService(PaymentsRepository paymentsRepository, BankClient bankClient) {
     this.paymentsRepository = paymentsRepository;
-    this.acquiringBankClient = acquiringBankClient;
+    this.bankClient = bankClient;
   }
 
   public PostPaymentResponse getPaymentById(UUID id) {
@@ -50,7 +49,7 @@ public class PaymentGatewayService {
     UUID paymentId = UUID.randomUUID();
     LOG.info("Request made to process payment with ID {}", paymentId);
 
-    boolean authorized = acquiringBankClient.authorize(paymentRequest);
+    boolean authorized = bankClient.authorize(paymentRequest);
     PaymentStatus status = authorized ? PaymentStatus.AUTHORIZED : PaymentStatus.DECLINED;
     String lastFour =
         paymentRequest.getCardNumber().substring(paymentRequest.getCardNumber().length() - 4);

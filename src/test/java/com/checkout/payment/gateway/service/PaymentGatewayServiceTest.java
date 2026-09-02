@@ -7,7 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.checkout.payment.gateway.bank.AcquiringBankClient;
+import com.checkout.payment.gateway.bank.BankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
 import com.checkout.payment.gateway.exception.BankCommunicationException;
 import com.checkout.payment.gateway.exception.PaymentNotFoundException;
@@ -21,14 +21,14 @@ import org.junit.jupiter.api.Test;
 class PaymentGatewayServiceTest {
 
   private PaymentsRepository repository;
-  private AcquiringBankClient bankClient;
+  private BankClient bankClient;
   private PaymentGatewayService service;
   private PostPaymentRequest paymentRequest;
 
   @BeforeEach
   void setUp() {
     repository = new PaymentsRepository();
-    bankClient = mock(AcquiringBankClient.class);
+    bankClient = mock(BankClient.class);
     service = new PaymentGatewayService(repository, bankClient);
     paymentRequest = request();
   }

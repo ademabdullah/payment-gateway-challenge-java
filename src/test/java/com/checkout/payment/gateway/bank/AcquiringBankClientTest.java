@@ -17,22 +17,27 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
-class RestAcquiringBankClientTest {
+class AcquiringBankClientTest {
+
+  private static final String BANK_BASE_URL = "http://bank.com";
+  private static final String BANK_PAYMENTS_URL = BANK_BASE_URL + "/payments";
 
   private MockRestServiceServer server;
-  private RestAcquiringBankClient client;
+  private AcquiringBankClient client;
 
   @BeforeEach
   void setUp() {
     RestTemplate restTemplate = new RestTemplate();
     server = MockRestServiceServer.bindTo(restTemplate).build();
-    client = new RestAcquiringBankClient(restTemplate, "http://bank.test");
+    client = new AcquiringBankClient(restTemplate, BANK_BASE_URL);
   }
 
   @Test
-  void sendsTheExpectedPayloadAndMapsAuthorization() {
+  void WhenAValidPayloadIsSentAValidResponseIsReturned() {
+    PostPaymentRequest paymentRequest = validPaymentRequest();
+
     server
-        .expect(requestTo("http://bank.test/payments"))
+        .expect(requestTo(BANK_PAYMENTS_URL))
         .andExpect(method(HttpMethod.POST))
         .andExpect(
             content()
@@ -51,30 +56,39 @@ class RestAcquiringBankClientTest {
                 "{\"authorized\":true,\"authorization_code\":\"abc\"}",
                 MediaType.APPLICATION_JSON));
 
-    assertThat(client.authorize(request())).isTrue();
+    boolean authorized = client.authorize(paymentRequest);
+
+    assertThat(authorized).isTrue();
     server.verify();
   }
 
   @Test
-  void mapsBankServiceFailuresToTheGatewayException() {
-    server.expect(requestTo("http://bank.test/payments")).andRespond(withServiceUnavailable());
+  void WhenARequestToTheAcquiringBankFailsThisIsMappedToAGatewayException() {
+    PostPaymentRequest paymentRequest = validPaymentRequest();
 
-    assertThatThrownBy(() -> client.authorize(request()))
-        .isInstanceOf(BankCommunicationException.class);
+    server.expect(requestTo(BANK_PAYMENTS_URL)).andRespond(withServiceUnavailable());
+
+    assertThatThrownBy(() -> client.authorize(paymentRequest))
+        .isInstanceOf(BankCommunicationException.class)
+        .hasMessage("Acquiring bank request failed");
+
     server.verify();
   }
 
   @Test
   void rejectsMalformedSuccessfulResponses() {
+    PostPaymentRequest paymentRequest = validPaymentRequest();
+
     server
-        .expect(requestTo("http://bank.test/payments"))
+        .expect(requestTo(BANK_PAYMENTS_URL))
         .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-    assertThatThrownBy(() -> client.authorize(request()))
-        .isInstanceOf(BankCommunicationException.class);
+    assertThatThrownBy(() -> client.authorize(paymentRequest))
+        .isInstanceOf(BankCommunicationException.class)
+        .hasMessage("Acquiring bank returned an invalid response");
   }
 
-  private PostPaymentRequest request() {
+  private PostPaymentRequest validPaymentRequest() {
     PostPaymentRequest request = new PostPaymentRequest();
     request.setCardNumber("2222405343248877");
     request.setExpiryMonth(4);
