@@ -16,7 +16,7 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
-Swagger UI is available at <http://localhost:8090/swagger-ui/index.html>.
+When the application is running, the Swagger Doc/UI is available at <http://localhost:8090/swagger-ui/index.html>.
 
 ### Process a payment
 
