@@ -83,8 +83,7 @@ We can discuss this more during the interview
   - The expiry month must be 1–12 and the combined expiry date must be in the future.
   - Supported currencies are GBP, USD, and EUR.
   - Amounts are integers and must be greater than zero.
-  - Negative amounts could form part of refund behavior in a broader payment API. Refunds require
-    their own business semantics and are not implemented here.
+  - Negative amounts could form part of refund behavior but I've decided this is beyond the scope of this excercise.
 
 The full card number and CVV are used only for the inital request to the acquiring bank. They are not stored,
 returned, or logged. For the long card number, only the last 4 digits are stored and returned as part of the /Payment (GET request)
