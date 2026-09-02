@@ -77,13 +77,14 @@ We can discuss this more during the interview
 
 ## Validation and assumptions
 
-- Card numbers must contain 14–19 numeric characters.
-- CVVs must contain 3–4 numeric characters.
-- The expiry month must be 1–12 and the combined expiry date must be in the future.
-- Supported currencies are GBP, USD, and EUR.
-- Amounts are integers and must be greater than zero.
-- Negative amounts could form part of refund behavior in a broader payment API. Refunds require
-  their own business semantics and are not implemented here.
+- I've followed the request and response schemas specified in the challenge, I've summarised these below:
+  - Card numbers must contain 14–19 numeric characters.
+  - CVVs must contain 3–4 numeric characters.
+  - The expiry month must be 1–12 and the combined expiry date must be in the future.
+  - Supported currencies are GBP, USD, and EUR.
+  - Amounts are integers and must be greater than zero.
+  - Negative amounts could form part of refund behavior in a broader payment API. Refunds require
+    their own business semantics and are not implemented here.
 
 The full card number and CVV are used only for the acquiring-bank request. They are never stored,
 returned, or logged. For the long card number, only the last 4 digits are stored
@@ -91,6 +92,8 @@ returned, or logged. For the long card number, only the last 4 digits are stored
 ## Bank integration
 
 The supplied Mountebank simulator listens on `http://localhost:8080/payments`:
+
+This was supplied as part of the intial challenge code and I'm reconfirming the behavior below:
 
 - Card numbers ending in an odd digit are Authorized.
 - Card numbers ending in 2, 4, 6, or 8 are Declined.
@@ -100,27 +103,23 @@ The bank URL and timeouts can be changed through `bank.base-url`, `bank.connect-
 
 ## Testing and formatting
 
-Run formatting checks and all Docker-independent tests with:
-
-```shell
-./gradlew check
-```
-
 Apply formatting with the below command:
 
 ```shell
 ./gradlew spotlessApply
 ```
 
-Run the end-to-end behavioral acceptance suite with:
+Run unit-tests with 
+
+```shell
+./gradlew test
+```
+
+Run the local acceptance suite with (but Docker must be installed locally and running on the user's machine):
 
 ```shell
 ./gradlew localAcceptanceTest
 ```
-
-The JUnit acceptance test uses Testcontainers to start Mountebank on dynamically allocated ports,
-runs the application on a random port, tests real HTTP calls through the gateway to the simulator,
-and shuts the container down.
 
 ## Design Decisions
 
