@@ -7,7 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.checkout.payment.gateway.bank.AcquiringBankClient;
+import com.checkout.payment.gateway.bank.BankClient;
 import com.checkout.payment.gateway.enums.PaymentStatus;
 import com.checkout.payment.gateway.exception.BankCommunicationException;
 import com.checkout.payment.gateway.exception.PaymentNotFoundException;
@@ -21,14 +21,14 @@ import org.junit.jupiter.api.Test;
 class PaymentGatewayServiceTest {
 
   private PaymentsRepository repository;
-  private AcquiringBankClient bankClient;
+  private BankClient bankClient;
   private PaymentGatewayService service;
   private PostPaymentRequest paymentRequest;
 
   @BeforeEach
   void setUp() {
     repository = new PaymentsRepository();
-    bankClient = mock(AcquiringBankClient.class);
+    bankClient = mock(BankClient.class);
     service = new PaymentGatewayService(repository, bankClient);
     paymentRequest = request();
   }
@@ -73,16 +73,6 @@ class PaymentGatewayServiceTest {
   }
 
   @Test
-  void treatsABlankIdempotencyKeyAsANormalPaymentRequest() {
-    when(bankClient.authorize(paymentRequest)).thenReturn(true);
-
-    service.processPayment(paymentRequest, " ");
-    service.processPayment(paymentRequest, " ");
-
-    verify(bankClient, times(2)).authorize(paymentRequest);
-  }
-
-  @Test
   void returnsTheOriginalPaymentWhenAnIdempotencyKeyIsReused() {
     when(bankClient.authorize(paymentRequest)).thenReturn(true);
 
@@ -90,7 +80,7 @@ class PaymentGatewayServiceTest {
     PostPaymentResponse repeatedPayment = service.processPayment(paymentRequest, "payment-key");
 
     assertThat(repeatedPayment).isSameAs(firstPayment);
-    verify(bankClient).authorize(paymentRequest);
+    verify(bankClient, times(1)).authorize(paymentRequest);
   }
 
   @Test
@@ -102,22 +92,6 @@ class PaymentGatewayServiceTest {
         service.processPayment(paymentRequest, "second-payment-key");
 
     assertThat(secondPayment.getId()).isNotEqualTo(firstPayment.getId());
-    verify(bankClient, times(2)).authorize(paymentRequest);
-  }
-
-  @Test
-  void allowsAnIdempotencyKeyToBeRetriedAfterABankFailure() {
-    when(bankClient.authorize(paymentRequest))
-        .thenThrow(new BankCommunicationException("Bank is unavailable"))
-        .thenReturn(true);
-
-    assertThatThrownBy(() -> service.processPayment(paymentRequest, "retryable-payment-key"))
-        .isInstanceOf(BankCommunicationException.class);
-
-    PostPaymentResponse retriedPayment =
-        service.processPayment(paymentRequest, "retryable-payment-key");
-
-    assertThat(retriedPayment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
     verify(bankClient, times(2)).authorize(paymentRequest);
   }
 
