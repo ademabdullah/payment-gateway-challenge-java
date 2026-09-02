@@ -86,8 +86,8 @@ We can discuss this more during the interview
   - Negative amounts could form part of refund behavior in a broader payment API. Refunds require
     their own business semantics and are not implemented here.
 
-The full card number and CVV are used only for the acquiring-bank request. They are never stored,
-returned, or logged. For the long card number, only the last 4 digits are stored
+The full card number and CVV are used only for the inital request to the acquiring bank. They are not stored,
+returned, or logged. For the long card number, only the last 4 digits are stored and returned as part of the /Payment (GET request)
 
 ## Bank integration
 
