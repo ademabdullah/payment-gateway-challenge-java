@@ -75,6 +75,27 @@ We can discuss this more during the interview
 
 `GET /payment/{id}` returns payment details or `404 Not Found` when the payment does not exist.
 
+Use the `id` returned when the payment was created:
+
+```shell
+curl -X GET http://localhost:8090/payment/fc328041-18cd-46eb-8b89-eaad6aee7757 \
+  -H 'Content-Type: application/json'
+```
+
+Example response:
+
+```json
+{
+  "id": "fc328041-18cd-46eb-8b89-eaad6aee7757",
+  "status": "Authorized",
+  "currency": "GBP",
+  "amount": 100,
+  "last_four": "8877",
+  "expiry_month": 12,
+  "expiry_year": 2099
+}
+```
+
 ## Validation and assumptions
 
 - Card numbers must contain 14–19 numeric characters.

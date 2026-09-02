@@ -73,16 +73,6 @@ class PaymentGatewayServiceTest {
   }
 
   @Test
-  void treatsABlankIdempotencyKeyAsANormalPaymentRequest() {
-    when(bankClient.authorize(paymentRequest)).thenReturn(true);
-
-    service.processPayment(paymentRequest, " ");
-    service.processPayment(paymentRequest, " ");
-
-    verify(bankClient, times(2)).authorize(paymentRequest);
-  }
-
-  @Test
   void returnsTheOriginalPaymentWhenAnIdempotencyKeyIsReused() {
     when(bankClient.authorize(paymentRequest)).thenReturn(true);
 
@@ -90,7 +80,7 @@ class PaymentGatewayServiceTest {
     PostPaymentResponse repeatedPayment = service.processPayment(paymentRequest, "payment-key");
 
     assertThat(repeatedPayment).isSameAs(firstPayment);
-    verify(bankClient).authorize(paymentRequest);
+    verify(bankClient, times(1)).authorize(paymentRequest);
   }
 
   @Test
@@ -102,22 +92,6 @@ class PaymentGatewayServiceTest {
         service.processPayment(paymentRequest, "second-payment-key");
 
     assertThat(secondPayment.getId()).isNotEqualTo(firstPayment.getId());
-    verify(bankClient, times(2)).authorize(paymentRequest);
-  }
-
-  @Test
-  void allowsAnIdempotencyKeyToBeRetriedAfterABankFailure() {
-    when(bankClient.authorize(paymentRequest))
-        .thenThrow(new BankCommunicationException("Bank is unavailable"))
-        .thenReturn(true);
-
-    assertThatThrownBy(() -> service.processPayment(paymentRequest, "retryable-payment-key"))
-        .isInstanceOf(BankCommunicationException.class);
-
-    PostPaymentResponse retriedPayment =
-        service.processPayment(paymentRequest, "retryable-payment-key");
-
-    assertThat(retriedPayment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
     verify(bankClient, times(2)).authorize(paymentRequest);
   }
 

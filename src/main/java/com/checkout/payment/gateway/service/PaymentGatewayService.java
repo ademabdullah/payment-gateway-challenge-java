@@ -41,8 +41,16 @@ public class PaymentGatewayService {
       return processNewPayment(paymentRequest);
     }
 
-    return idempotentPaymentResponses.computeIfAbsent(
-        idempotencyKey, ignoredIdempotencyKey -> processNewPayment(paymentRequest));
+    PostPaymentResponse existingResponse =
+        idempotentPaymentResponses.get(idempotencyKey);
+
+    if (existingResponse != null) {
+      return existingResponse;
+    }
+
+    PostPaymentResponse newResponse = processNewPayment(paymentRequest);
+    idempotentPaymentResponses.put(idempotencyKey, newResponse);
+    return newResponse;
   }
 
   private PostPaymentResponse processNewPayment(PostPaymentRequest paymentRequest) {
